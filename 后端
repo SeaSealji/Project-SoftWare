@@ -1,0 +1,76 @@
+from flask import Flask, request, jsonify, render_template
+import os
+import cv2
+import numpy as np
+from werkzeug.utils import secure_filename
+
+app = Flask(__name__)
+
+# 配置文件上传目录
+UPLOAD_FOLDER = 'static/uploads/'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# 允许的文件类型
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'tif'}
+
+# 判断文件类型是否合法
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# 图像变化检测函数
+def detect_changes(image1_path, image2_path):
+    # 读取两幅图像
+    img1 = cv2.imread(image1_path, 0)
+    img2 = cv2.imread(image2_path, 0)
+
+    # 图像预处理（去噪，归一化等）
+    img1 = cv2.GaussianBlur(img1, (5, 5), 0)
+    img2 = cv2.GaussianBlur(img2, (5, 5), 0)
+
+    # 计算两幅图像的差异
+    diff = cv2.absdiff(img1, img2)
+    _, thresholded = cv2.threshold(diff, 50, 255, cv2.THRESH_BINARY)  # 设置阈值，提取变化区域
+
+    # 保存处理结果
+    result_path = os.path.join(app.config['UPLOAD_FOLDER'], 'result.png')
+    cv2.imwrite(result_path, thresholded)
+    return result_path
+
+# 上传和检测变化的API
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    # 检查是否有上传文件
+    if 'file1' not in request.files or 'file2' not in request.files:
+        return jsonify({'error': '请上传两幅图像文件！'}), 400
+
+    file1 = request.files['file1']
+    file2 = request.files['file2']
+
+    # 验证文件格式
+    if file1 and allowed_file(file1.filename) and file2 and allowed_file(file2.filename):
+        filename1 = secure_filename(file1.filename)
+        filename2 = secure_filename(file2.filename)
+        filepath1 = os.path.join(app.config['UPLOAD_FOLDER'], filename1)
+        filepath2 = os.path.join(app.config['UPLOAD_FOLDER'], filename2)
+
+        # 保存上传的图像
+        file1.save(filepath1)
+        file2.save(filepath2)
+
+        # 执行变化检测
+        result_path = detect_changes(filepath1, filepath2)
+
+        # 返回结果路径
+        return jsonify({'result': result_path}), 200
+    else:
+        return jsonify({'error': '文件类型不支持！'}), 400
+
+# 前端页面（简单的文件上传表单）
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+if __name__ == '__main__':
+    # 创建上传目录
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    app.run(debug=True)
