@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 from werkzeug.utils import secure_filename
 from flask import send_from_directory
-from model import change_detection
+from predict import predict
+from Net import DDNet,MRC
 
 # Flask应用初始化
 app = Flask(__name__)
@@ -14,7 +15,7 @@ UPLOAD_FOLDER = 'back/uploads'
 RESULT_FOLDER = 'back/results' 
 HTML_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '前端页面版本/前端页面正式版01'))  # 上层目录中的HTML文件夹
 STATIC_FOLDER = os.path.join(HTML_FOLDER, 'assets')  # 静态资源文件夹
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'tif'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'tif', 'bmp'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULT_FOLDER'] = RESULT_FOLDER
 
@@ -88,7 +89,8 @@ def upload_file():
             result_path = detect_changes_optical(filepath1, filepath2)
         elif model_type == 'sar':
             # 执行SAR模型（目前为空白，等待修改）
-            result_path = change_detection(filepath1, filepath2)
+            result_path = "1.bmp"
+            predict(filepath1, filepath2, "model2.pt", result_path)
         else:
             return jsonify({'error': '不支持的模型类型！'}), 400
         
